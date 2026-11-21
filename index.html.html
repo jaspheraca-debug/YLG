@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YLG | Shop</title>
+<style>
+:root{--bg:#f1f3f7;--surface:#ffffff;--ink:#161b2b;--muted:#5b6478;--line:#d9deea;--accent:#2438d9;--accent-ink:#ffffff}
+@media (prefers-color-scheme:dark){:root{--bg:#12151f;--surface:#1b2030;--ink:#eef0f7;--muted:#9aa3b8;--line:#2b3247;--accent:#7f8fff;--accent-ink:#12151f}}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:5}
+.logo{font-weight:800;font-size:1.4rem;letter-spacing:-.02em}
+.cart{font:inherit;font-weight:600;background:var(--accent);color:var(--accent-ink);border:0;border-radius:999px;padding:8px 16px;cursor:pointer}
+main{max-width:1000px;margin:0 auto;padding:28px 20px 48px}
+h1{font-size:clamp(2rem,7vw,3.4rem);font-weight:800;letter-spacing:-.03em;line-height:1.05;margin:0 0 8px;max-width:14ch}
+.sub{color:var(--muted);margin:0 0 24px;max-width:46ch}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px}
+.chip{font:inherit;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:6px 14px;cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:20px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.photo{aspect-ratio:4/5;display:grid;place-items:center;font-size:3.5rem;font-weight:800;color:rgba(255,255,255,.85);overflow:hidden}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.info{padding:14px;display:flex;flex-direction:column;gap:4px;flex:1}
+.name{font-weight:600}
+.price{color:var(--muted)}
+.size{font:inherit;margin-top:8px;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.add{font:inherit;font-weight:600;margin-top:8px;padding:9px;border:0;border-radius:6px;background:var(--ink);color:var(--bg);cursor:pointer}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw;text-align:center}
+.toast.show{opacity:1}
+[hidden]{display:none!important}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20;display:flex;justify-content:flex-end}
+.sheet{background:var(--surface);width:min(420px,100%);height:100%;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;font-size:1.2rem}
+.x{font:inherit;background:transparent;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.item small{color:var(--muted)}
+.rm{font:inherit;background:transparent;color:var(--muted);border:0;cursor:pointer;text-decoration:underline}
+.total{display:flex;justify-content:space-between;font-size:1.1rem}
+.sheet label{display:flex;flex-direction:column;gap:4px;font-size:.9rem;color:var(--muted)}
+.sheet input{font:inherit;padding:9px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.send{font:inherit;font-weight:600;border:0;border-radius:8px;background:var(--accent);color:var(--accent-ink);padding:12px;cursor:pointer}
+.note{color:var(--muted);font-size:.9rem;margin:0}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">YLG</div>
+  <button class="cart" id="cartBtn" aria-label="Open cart">Cart (<span id="count">0</span>)</button>
+</header>
+<main>
+  <h1>Wear it everyday.</h1>
+  <p class="sub">Simple pieces that go with everything. Pick your size and add it to your cart.</p>
+  <div class="filters" id="filters" role="group" aria-label="Filter by category"></div>
+  <div class="grid" id="grid"></div>
+</main>
+<div class="overlay" id="overlay" hidden>
+  <section class="sheet" role="dialog" aria-label="Your cart">
+    <div class="sheet-head"><strong>Your cart</strong><button class="x" id="closeCart" aria-label="Close cart">✕</button></div>
+    <div id="cartItems"></div>
+    <div class="total"><span>Total</span><strong id="total">₱0</strong></div>
+    <label>Your name<input id="cName" autocomplete="name"></label>
+    <label>Phone number or Messenger name<input id="cContact"></label>
+    <button class="send" id="sendOrder">Send order</button>
+    <p class="note" id="orderNote"></p>
+  </section>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<!-- Your product list and contact settings are at the top of this script. -->
+<script>
+// YLG products. Edit this list to change what your shop sells.
+// name: product name | price: number in pesos | cat: category (filter button)
+// color: card color shown when there is no photo | img: photo file path, e.g. "images/boxy-tee.jpg" (leave "" for none)
+var products = [
+  { name: "Boxy Tee",        price: 450,  cat: "Tops",      color: "#2438d9", img: "" },
+  { name: "Ribbed Tank",     price: 350,  cat: "Tops",      color: "#c2410c", img: "" },
+  { name: "Oversized Shirt", price: 650,  cat: "Tops",      color: "#0f766e", img: "" },
+  { name: "Straight Jeans",  price: 1100, cat: "Bottoms",   color: "#334155", img: "" },
+  { name: "Pleated Skirt",   price: 750,  cat: "Bottoms",   color: "#9d174d", img: "" },
+  { name: "Cargo Shorts",    price: 600,  cat: "Bottoms",   color: "#4d7c0f", img: "" },
+  { name: "Zip Hoodie",      price: 1300, cat: "Outerwear", color: "#6d28d9", img: "" },
+  { name: "Denim Jacket",    price: 1500, cat: "Outerwear", color: "#1e3a8a", img: "" }
+];
+
+// How customers send you their order. Fill in ONE or both (keep the quotes):
+// email: your email address, e.g. "ylg@gmail.com"
+// messenger: your Facebook page/user name, e.g. "ylgclothing" (opens m.me/ylgclothing)
+var store = { email: "", messenger: "" };
+
+</script>
+<script>
+var active = "All", cart = [];
+var grid = document.getElementById("grid");
+var filters = document.getElementById("filters");
+var toast = document.getElementById("toast");
+
+function el(tag, cls, text){
+  var e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+function showToast(msg){
+  toast.textContent = msg;
+  toast.classList.add("show");
+  clearTimeout(showToast.t);
+  showToast.t = setTimeout(function(){ toast.classList.remove("show"); }, 2000);
+}
+
+function renderFilters(){
+  var cats = ["All"];
+  products.forEach(function(p){ if (p.cat && cats.indexOf(p.cat) < 0) cats.push(p.cat); });
+  filters.innerHTML = "";
+  cats.forEach(function(c){
+    var b = el("button", "chip", c);
+    b.setAttribute("aria-pressed", c === active);
+    b.onclick = function(){ active = c; renderFilters(); renderGrid(); };
+    filters.appendChild(b);
+  });
+}
+
+function renderGrid(){
+  grid.innerHTML = "";
+  products.filter(function(p){ return active === "All" || p.cat === active; }).forEach(function(p){
+    var card = el("article", "card");
+    var photo = el("div", "photo");
+    if (p.img) {
+      var im = document.createElement("img");
+      im.src = p.img; im.alt = p.name; im.loading = "lazy";
+      photo.appendChild(im);
+    } else {
+      photo.textContent = p.name.charAt(0).toUpperCase();
+      photo.style.background = p.color || "#334155";
+    }
+    var info = el("div", "info");
+    info.appendChild(el("div", "name", p.name));
+    info.appendChild(el("div", "price", "₱" + Number(p.price).toLocaleString()));
+    var sel = el("select", "size");
+    sel.setAttribute("aria-label", "Size for " + p.name);
+    ["S","M","L","XL"].forEach(function(s){ var o = el("option", "", s); if (s === "M") o.selected = true; sel.appendChild(o); });
+    var add = el("button", "add", "Add to cart");
+    add.onclick = function(){
+      cart.push({ name: p.name, size: sel.value, price: Number(p.price) });
+      renderCart();
+      showToast(p.name + " (" + sel.value + ") added to cart");
+    };
+    info.appendChild(sel); info.appendChild(add);
+    card.appendChild(photo); card.appendChild(info);
+    grid.appendChild(card);
+  });
+}
+
+function peso(n){ return "₱" + Number(n).toLocaleString(); }
+function note(msg){ document.getElementById("orderNote").textContent = msg; }
+
+function renderCart(){
+  var box = document.getElementById("cartItems");
+  box.innerHTML = "";
+  var total = 0;
+  cart.forEach(function(it, i){
+    total += it.price;
+    var row = el("div", "item");
+    var left = el("div");
+    left.appendChild(el("div", "", it.name));
+    left.appendChild(el("small", "", "Size " + it.size + " · " + peso(it.price)));
+    var rm = el("button", "rm", "Remove");
+    rm.onclick = function(){ cart.splice(i, 1); renderCart(); };
+    row.appendChild(left); row.appendChild(rm);
+    box.appendChild(row);
+  });
+  if (!cart.length) box.appendChild(el("p", "note", "Your cart is empty."));
+  document.getElementById("count").textContent = cart.length;
+  document.getElementById("total").textContent = peso(total);
+}
+
+function sendOrder(){
+  if (!cart.length) { note("Your cart is empty."); return; }
+  var name = document.getElementById("cName").value.trim();
+  var contact = document.getElementById("cContact").value.trim();
+  if (!name || !contact) { note("Please enter your name and contact."); return; }
+  var total = 0;
+  var lines = cart.map(function(it){ total += it.price; return "- " + it.name + " (" + it.size + ") " + peso(it.price); });
+  var text = "YLG order\nName: " + name + "\nContact: " + contact + "\n" + lines.join("\n") + "\nTotal: " + peso(total);
+  if (navigator.clipboard) navigator.clipboard.writeText(text).catch(function(){});
+  if (typeof store !== "undefined" && store.email) {
+    location.href = "mailto:" + store.email + "?subject=" + encodeURIComponent("YLG order") + "&body=" + encodeURIComponent(text);
+  } else if (typeof store !== "undefined" && store.messenger) {
+    note("Order copied. Paste it in the Messenger chat that opens.");
+    window.open("https://m.me/" + store.messenger, "_blank");
+  } else {
+    note("Order copied. Paste it in a message to the shop.");
+  }
+}
+
+var overlay = document.getElementById("overlay");
+document.getElementById("cartBtn").onclick = function(){ overlay.hidden = false; };
+document.getElementById("closeCart").onclick = function(){ overlay.hidden = true; };
+overlay.onclick = function(e){ if (e.target === overlay) overlay.hidden = true; };
+document.getElementById("sendOrder").onclick = sendOrder;
+
+renderFilters();
+renderGrid();
+renderCart();
+</script>
+</body>
+</html>
